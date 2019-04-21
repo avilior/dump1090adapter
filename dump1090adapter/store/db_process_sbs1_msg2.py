@@ -1,6 +1,8 @@
 from pathlib import Path
 from dump1090adapter.store.sbs1 import SBS1Message
 import aiosqlite
+from databases import Database
+from datetime import datetime
 
 
 CREATE_ICAO_TABLE = """CREATE TABLE IF NOT EXISTS icao (
@@ -48,28 +50,8 @@ async def create_table(db_conn, create_table_sql):
         print(e)
 
 
-async def prepare_db(db_file: Path, create_flag = False):
 
-    if not db_file.exists() and not create_flag:
-        print("Database does not exist.  To create it set CREATE_DB to True")
-        return
-
-    async with aiosqlite.connect(str(db_file)) as db:
-        await db.execute(CREATE_TRACK_POINT_TABLE)
-        await db.commit()
-
-
-    """
-    db_conn = await create_connection(db_file)
-
-    if db_conn:
-        await create_table(db_conn, CREATE_ICAO_TABLE)
-        await create_table(db_conn, CREATE_TRACK_POINT_TABLE)
-        await db_conn.commit()
-        await db_conn.close()
-    """
-
-async def upsert_point(db_conn, icao,ts, lat = None,lon = None, callsign = None, hd = None, altitude = None, gspd=None,vrt=None):
+async def upsert_point(database: Database, icao,ts, lat = None,lon = None, callsign = None, hd = None, altitude = None, gspd=None,vrt=None):
 
     terms = []
     columns = []
@@ -117,42 +99,61 @@ async def upsert_point(db_conn, icao,ts, lat = None,lon = None, callsign = None,
     values_string  = ','.join(values)
 
     where = F'WHERE icao = "{icao}" AND ts = "{ts}";'
-    q = F"UPDATE point SET\n {terms_string} {where}"
-    print(q)
+    q = F"UPDATE track_point SET\n {terms_string} {where}"
+    #print(q)
 
     try:
-        c = await db_conn.cursor()
+
+        transaction = await database.transaction()
+
+        #print("@upsert_point: transaction started")
+
+        # we need the cursor to determine how many rows are inserted so we can do the upsert
+
+        conn = database.connection().raw_connection
+
+        c = await conn.cursor()
+
         await c.execute(q)
 
         if c.rowcount == 0:
             # do an insert
-            insert_q = F'INSERT INTO point ({columns_string}) VALUES ({values_string})'
+            insert_q = F'INSERT INTO track_point ({columns_string}) VALUES ({values_string})'
             await c.execute(insert_q)
-            print(F"Inserted {c.rowcount}")
+            #print(F"Inserted {c.rowcount}")
         else:
             print(F"Updated {c.rowcount}")
 
         # check if there are any changes
 
-        await db_conn.commit()
-    except aiosqlite.Error as e:
-        print(e)
+        await transaction.commit()
 
-async def db_process_sbs1_msg(db_conn, msg: SBS1Message):
+        #print("@upsert_point: transaction commited")
+
+    except aiosqlite.Error as e:
+        print(F"@upsert_point: Caught aiosqlite.Error: {e}")
+        raise
+    except Exception as x:
+        print(F"@upsert_point: Caught exception {x}")
+        raise
+
+async def db_process_sbs1_msg(database, icao24: str, timestamp: datetime, rec: dict):
+
+    #print("DB_PROCESS_SBS1_MSG")
 
     #msg.dump()
-    #print(msg.icao24)
-    #print(msg.generatedDate)
-
-    # get the database record for the icao
+        # get the database record for the icao
     #print(F"Fetching database record for icao24")
     #                  (db_conn, icao,ts, lat = None,lon = None, callsign = None, hd = None, altitude = None, gspd=None,vrt=None):
-    await upsert_point(db_conn,msg.icao24,
-                       msg.generatedDate,
-                       lat=msg.lat, lon=msg.lon,
-                       callsign=msg.callsign,
-                       hd=msg.track,  # heading
-                       altitude=msg.altitude,
-                       gspd=msg.groundSpeed,
-                       vrt=msg.verticalRate
+
+    await upsert_point(database,
+                       icao24,
+                       timestamp,
+                       lat=rec['lat'], lon=rec['lon'],
+                       callsign=rec['callsign'],
+                       hd=rec['track'],  # heading
+                       altitude=rec['altitude'],
+                       gspd=rec['groundSpeed'],
+                       vrt=rec['verticalRate']
                        )
+

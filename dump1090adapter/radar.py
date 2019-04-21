@@ -1,7 +1,11 @@
+from asyncio.queues import Queue
+from asyncio import CancelledError
 import matplotlib.pyplot as plt
 import numpy as np
 import time
 from geographiclib.geodesic import Geodesic
+
+from dump1090adapter.dump1090processor.dump1090receiver import INCOMING_ACTION_TYPE
 
 text_style = dict(horizontalalignment='center', verticalalignment='center', fontsize=8, fontdict={'family':'monospace'})
 
@@ -105,8 +109,29 @@ class Radar():
         track_text = self.ax.text(bearing_as_radian, range, label, **text_style)
 
 
-def update_track(track_name: str, lat, lon):
 
+
+
+home_lat = 45.25056
+home_lon = -75.89996
+
+yow_lat = 45.320165386
+yow_lon = -75.668163994
+
+plt.ion()
+fig = plt.figure(figsize=(12, 5))  # size
+plt.grid(color='#888888')
+
+_radar1 = Radar(fig, 121, home_lat, home_lon)
+_radar2 = Radar(fig, 122, yow_lat, yow_lon, 25)
+
+_radar1.add_place('YOW', yow_lat, yow_lon)
+_radar2.add_place('H', home_lat, home_lon)
+_radar1.refresh()
+_radar2.refresh()
+
+
+def update_track(track_name: str, lat, lon):
     if lat is None or lon is None:
         remove_track(track_name)
         return
@@ -125,22 +150,28 @@ def remove_track(track_name: str):
     _radar2.refresh()
 
 
-home_lat = 45.25056
-home_lon = -75.89996
+async def radar(radar_Q: Queue = None):
 
-yow_lat = 45.320165386
-yow_lon = -75.668163994
+    if radar_Q is None:
+        print("Radar task is terminating. The radar_Q is None. Nothing to do")
+        return
+
+    try:
+        while True:
+
+            incoming_action:INCOMING_ACTION_TYPE = await radar_Q.get()
+
+            #sbs1_msg = incoming_action.actionMsg
+
+            print(F"RADAR_RXED: {incoming_action}")
+
+    except CancelledError:
+            print("Cancellling radar task")
+
+    except Exception as x:
+        print(F"Exception {x}")
 
 
-plt.ion()
-fig = plt.figure(figsize=(12,5))  # size
-plt.grid(color='#888888')
 
-_radar1 = Radar(fig,121, home_lat, home_lon)
-_radar2 = Radar(fig,122, yow_lat, yow_lon, 25)
 
-_radar1.add_place('YOW', yow_lat, yow_lon)
-_radar2.add_place('H', home_lat, home_lon)
-_radar1.refresh()
-_radar2.refresh()
 

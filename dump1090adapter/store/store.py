@@ -1,120 +1,165 @@
 from .sbs1 import SBS1Message
 import texttable
 import datetime
-import os
-from dump1090adapter.radar import update_track,  remove_track
+from collections import namedtuple
+#from dump1090adapter.radar import update_track,  remove_track
 
 from geographiclib.geodesic import Geodesic
 
 import aiosqlite
 
-db = {}   # icao24  {  lasts generatedDate }
+SBS1Changed = namedtuple('SBS1Changed', ['id',
+                                         'new_aircraft',
+                                         'callsign',
+                                         'squawk',
+                                         'altitude',
+                                         'ground_speed',
+                                         'track',
+                                         'lat',
+                                         'lon',
+                                         'vertical_rate',
+                                         'on_ground',
+                                         'alert',
+                                         'emergency',
+                                         'spi',
+                                         'icao_record'
+                                         ])
 
+# local store of aircraft that we are currently monitoring
+db2 = {}
 
-def process4db(sbs1msg:SBS1Message):
-    if not sbs1msg.isValid:
-        return
-    # if icao24 is not in database then create a record for it
-    # if icao24 is in database then update last seen
+def update(c, field_name, value):
+    if value != None:
+        changed = c[field_name] != value
+        c[field_name] = value
+        return changed
+    return False
 
+def process2(sbs1msg:SBS1Message):
 
-def process(sbs1msg:SBS1Message):
     if not sbs1msg.isValid:
         print("Message not valid")
         return
 
+    new_aircraft         = False
+    changed_callsign     = False
+    changed_squawk       = False
+    changed_altitude     = False
+    changed_ground_speed = False
+    changed_track        = False
+    changed_lat          = False
+    changed_lon          = False
+    changed_vertical_rate= False
+    changed_on_ground    = False
+    changed_alert        = False
+    changed_emergency    = False
+    changed_spi          = False
 
-    #sbs1msg.dump()
-    # check to see if the icao24 is in the db
-    if sbs1msg.icao24 not in db:
-
-        #print(F"New aircraft {sbs1msg.icao24}")
-        db[sbs1msg.icao24] = {
-            'last_seen' : None,
-            'current'   : {
-                "callsign"         : None,
-                "altitude"         : None,
-                "groundSpeed"      : None,
-                "track"            : None,
-                "lat"              : None,
-                "lon"              : None,
-                "verticalRate"     : None,
-                "squawk"           : None,
-                "alert"            : None,
-                "emergency"        : None,
-                "spi"              : None,
-                "onGround"         : None
-                }
+    if sbs1msg.icao24 not in db2:
+        db2[sbs1msg.icao24] = {
+            'last_seen': None,
+            'current': {
+                "callsign":    None,
+                "altitude":    None,
+                "groundSpeed": None,
+                "track":       None,
+                "lat":         None,
+                "lon":         None,
+                "verticalRate":None,
+                "squawk":      None,
+                "alert":       None,
+                "emergency":   None,
+                "spi":         None,
+                "onGround":    None
             }
+        }
+        new_aircraft = True
 
-    r = db[sbs1msg.icao24]
+    r = db2[sbs1msg.icao24]
     c = r['current']
 
     r['last_seen'] = sbs1msg.loggedDate
-
 
     if sbs1msg.messageType == 'MSG':
 
         if sbs1msg.transmissionType == 1:
 
-            c["callsign"]    = sbs1msg.callsign
+            changed_callsign = update(c, "callsign", sbs1msg.callsign)
 
         elif sbs1msg.transmissionType == 2:
 
-            c["altitude"]    = sbs1msg.altitude
-            c["groundSpeed"] = sbs1msg.groundSpeed
-            c["track"]       = sbs1msg.track
-            c["lat"]         = sbs1msg.lat
-            c["lon"]         =  sbs1msg.lon
-            c["onGround"]    = sbs1msg.onGround
+            changed_altitude     = update(c, "altitude",    sbs1msg.altitude)
+            changed_ground_speed = update(c, "groundSpeed", sbs1msg.groundSpeed)
+            changed_track        = update(c, "track",       sbs1msg.track)
+            changed_lat          = update(c, "lat",         sbs1msg.lat)
+            changed_lon          = update(c, "lon",         sbs1msg.lon)
+            changed_on_ground    = update(c, "onGround",    sbs1msg.onGround)
 
         elif sbs1msg.transmissionType == 3:
 
-            c["altitude"]    = sbs1msg.altitude
-            c["lat"]         = sbs1msg.lat
-            c["lon"]         = sbs1msg.lon
-            c["alert"]       = sbs1msg.alert
-            c["emergency"]   = sbs1msg.emergency
-            c["spi"]         = sbs1msg.spi
-            c["onGround"]    = sbs1msg.onGround
+            changed_altitude = update(c, "altitude",  sbs1msg.altitude)
+            changed_lat      = update(c, "lat",       sbs1msg.lat)
+            changed_lon      = update(c, "lon",       sbs1msg.lon)
+            changed_alert    = update(c, "alert",     sbs1msg.alert)
+            changed_emergency= update(c, "emergency", sbs1msg.emergency)
+            changed_spi      = update(c, "spi",       sbs1msg.spi)
+            changed_on_ground= update(c, "onGround",  sbs1msg.onGround)
 
         elif sbs1msg.transmissionType == 4:
 
-            c["groundSpeed"]  = sbs1msg.groundSpeed
-            c["track"]        = sbs1msg.track
-            c["verticalRate"] = sbs1msg.verticalRate
+            changed_ground_speed  = update(c, "groundSpeed",  sbs1msg.groundSpeed)
+            changed_track         = update(c, "track",        sbs1msg.track)
+            changed_vertical_rate = update(c, "verticalRate", sbs1msg.verticalRate)
 
         elif sbs1msg.transmissionType == 5:
 
-            c["altitude"]     = sbs1msg.altitude
-            c["alert"]        = sbs1msg.alert
-            c["spi"]          = sbs1msg.spi
-            c["onGround"]     = sbs1msg.onGround
+            changed_altitude = update(c, "altitude", sbs1msg.altitude)
+            changed_alert    = update(c, "alert",    sbs1msg.alert)
+            changed_spi      = update(c, "spi",      sbs1msg.spi)
+            changed_on_ground= update(c, "onGround", sbs1msg.onGround)
 
         elif sbs1msg.transmissionType == 6:
 
-            c["altitude"]     = sbs1msg.altitude
-            c["squawk" ]      = sbs1msg.squawk
-            c["alert"]        = sbs1msg.alert
-            c["emergency"]    = sbs1msg.emergency
-            c["spi"]          = sbs1msg.spi
-            c["onGround"]     = sbs1msg.onGround
+            changed_altitude = update(c, "altitude",  sbs1msg.altitude)
+            changed_squawk   = update(c, "squawk",    sbs1msg.squawk)
+            changed_alert    = update(c, "alert",     sbs1msg.alert)
+            changed_emergency= update(c, "emergency", sbs1msg.emergency)
+            changed_spi      = update(c, "spi",       sbs1msg.spi)
+            changed_on_ground = update(c, "onGround",  sbs1msg.onGround)
 
         elif sbs1msg.transmissionType == 7:
 
-            c["altitude"]     = sbs1msg.altitude
-            c["onGround"]     = sbs1msg.onGround
+            changed_altitude  = update(c, "altitude", sbs1msg.altitude)
+            changed_on_ground = update(c, "onGround", sbs1msg.onGround)
 
         elif sbs1msg.transmissionType == 8:
 
-            c["onGround"] = sbs1msg.onGround
+            changed_on_ground = update(c, "onGround", sbs1msg.onGround)
 
         else:
             print("WTF????")
+            return
     else:
-        print(F"Received {sbs1msg.messageType} msg")
+        print(F"Received un handled message type: {sbs1msg.messageType}")
+        return
 
-    #print(f"{sbs1msg.icao24} {db[sbs1msg.icao24]}")
+    return SBS1Changed(
+                id           = sbs1msg.icao24,
+                new_aircraft = new_aircraft,
+                callsign     = changed_callsign,
+                squawk       = changed_squawk,
+                altitude     = changed_altitude,
+                ground_speed = changed_ground_speed,
+                track        = changed_track,
+                lat          = changed_lat,
+                lon          = changed_lon,
+                vertical_rate= changed_vertical_rate,
+                on_ground    = changed_on_ground,
+                alert        = changed_alert,
+                emergency    = changed_emergency,
+                spi          = changed_spi,
+                icao_record= r)
+
 
 home_lat = 45.25056
 home_lon = -75.89996
@@ -123,12 +168,61 @@ yow_lat = 45.320165386
 yow_lon = -75.668163994
 
 
+TABLE_COL_NAME  = ["ICAO","CALLSIGN","SQUAWK","GROUND","LAT","LON","HD","ALT","V-RATE","LAND","YOW-D","YOW-HD","HOME-D","HOME-HD","AGE"]
+TABLE_ALIGNMENT = ["l","l","l","l","l","l","l","l","l","l","l","l","l","l","l"]
+
+def dump_row(db, icao24):
+    table = texttable.Texttable()
+
+    table.header(TABLE_COL_NAME)
+    table.set_header_align(TABLE_ALIGNMENT)
+    table.set_max_width(0)
+
+    r = db[icao24]
+    if r is None:
+        return
+
+    c = r['current']
+
+    delta_sec = (datetime.datetime.utcnow() - r['last_seen']).total_seconds()
+
+    yow_distance = '-'
+    yow_heading = '-'
+    home_distance = '-'
+    home_heading = '-'
+    if c['lat'] is not None and c['lon'] is not None:
+        yow = Geodesic.WGS84.Inverse(yow_lat, yow_lon, c['lat'], c['lon'])
+        yow_distance = yow['s12'] / 1e3
+        yow_heading = yow['azi1']
+
+        home = Geodesic.WGS84.Inverse(home_lat, home_lon, c['lat'], c['lon'])
+        home_distance = home['s12'] / 1e3
+        home_heading = home['azi1']
+        if home_heading < 0:
+            home_heading = 360 + home_heading
+        if yow_heading < 0:
+            yow_heading = 360 - yow_heading
+
+    # CLASS A Airspace Flight Level conversion
+    if c['altitude'] is not None and c['altitude'] > 18000:
+        altitude = F"FL{int(c['altitude'] / 100):03d}"
+    else:
+        altitude = c['altitude']
+
+
+    row = [icao24, c['callsign'], c["squawk"], c["groundSpeed"], c['lat'], c['lon'], c["track"], altitude, c["verticalRate"], c["onGround"], yow_distance, yow_heading, home_distance, home_heading, delta_sec]
+
+    table.add_row(row)
+
+    print(f"{table.draw()}")
+
+
 def dump_store():
 
     table = texttable.Texttable()
 
-    table.header(["ICAO","CALLSIGN","SQUAWK","GROUND","LAT","LON","HD","ALT","V-RATE","LAND","YOW-D","YOW-HD","HOME-D","HOME-HD","AGE"])
-    table.set_header_align(["l","l","l","l","l","l","l","l","l","l","l","l","l","l","l"])
+    table.header(TABLE_COL_NAME)
+    table.set_header_align(TABLE_ALIGNMENT)
     table.set_max_width(0)
 
     time_now = datetime.datetime.utcnow()
@@ -181,8 +275,6 @@ def dump_store():
 
         if c['lat'] is not None and c['lon'] is not None:
             update_track(icao24, c['lat'], c['lon'])
-
-
 
     if changed:
         print(F"{time_now}")

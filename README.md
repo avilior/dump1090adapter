@@ -73,3 +73,10 @@ https://flightaware.com/live/flight/N991CE
 
 * what happens if a plane (icao24) comes in range, leaves range and comes back.  Is that a different track?
     * this can also be a plane landing and taking off
+
+
+### fastAPI and database
+
+https://fastapi.tiangolo.com/tutorial/async-sql-databases/
+
+https://github.com/encode/databases
