@@ -28,6 +28,29 @@ SBS1Changed = namedtuple('SBS1Changed', ['id',
 # local store of aircraft that we are currently monitoring
 db2 = {}
 
+last_flush_time = datetime.datetime.utcnow()
+
+def flush_cache(seconds):
+    global last_flush_time
+
+    time_now = datetime.datetime.utcnow()
+
+    if (time_now - last_flush_time).total_seconds() < 60:
+        return
+
+    last_flush_time = time_now
+
+    items_to_remove = []
+    max_delta = 0
+    for id,r in db2.items():
+        delta_sec = (time_now - r['last_seen']).total_seconds()
+        max_delta = max(max_delta, delta_sec)
+        if delta_sec > 300:
+                items_to_remove.append(id)
+    print(F"FLUSH: length of cache {len(db2)} Items to remove {len(items_to_remove)} max: {max_delta}")
+    for id in items_to_remove:
+        del db2[id]
+
 def update(c, field_name, value):
     if value != None:
         changed = c[field_name] != value
@@ -216,7 +239,7 @@ def dump_row(db, icao24):
 
     print(f"{table.draw()}")
 
-
+"""
 def dump_store():
 
     table = texttable.Texttable()
@@ -280,7 +303,7 @@ def dump_store():
         print(F"{time_now}")
         print(f"{table.draw()}")
 
-
+"""
 
 
 

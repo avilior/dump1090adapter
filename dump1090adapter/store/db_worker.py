@@ -2,11 +2,11 @@ import logging
 from pathlib import Path
 from asyncio.queues import Queue
 from asyncio import CancelledError
-from dump1090adapter.store.sbs1 import SBS1Message
-from dump1090adapter.store.db_process_sbs1_msg2 import db_process_sbs1_msg
+from store.sbs1 import SBS1Message
+from store.db_process_sbs1_msg2 import db_process_sbs1_msg
 from databases import Database
 
-from dump1090adapter.dump1090processor.dump1090receiver import INCOMING_ACTION_TYPE
+from dump1090processor.dump1090receiver import INCOMING_ACTION_TYPE
 
 LOG = logging.getLogger("dump1090Receiver")
 
@@ -26,6 +26,10 @@ CREATE_TRACK_POINT_TABLE = """CREATE TABLE IF NOT EXISTS track_point(
 
 
 async def dbWorker(db_path: str, db_workerQ: Queue):
+
+    if db_workerQ is None:
+        print(F"db worker queue is None not starting ")
+        return
 
     print(F"Connecting to db at url: {db_path}")
 

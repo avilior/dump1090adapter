@@ -1,5 +1,5 @@
 from pathlib import Path
-from dump1090adapter.store.sbs1 import SBS1Message
+from store.sbs1 import SBS1Message
 import aiosqlite
 from databases import Database
 from datetime import datetime
@@ -122,7 +122,8 @@ async def upsert_point(database: Database, icao,ts, lat = None,lon = None, calls
             await c.execute(insert_q)
             #print(F"Inserted {c.rowcount}")
         else:
-            print(F"Updated {c.rowcount}")
+            #print(F"Updated {c.rowcount}")
+            pass
 
         # check if there are any changes
 

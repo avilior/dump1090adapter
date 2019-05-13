@@ -1,8 +1,8 @@
 import logging
 from asyncio.queues import Queue
-from asyncio import CancelledError
-from dump1090adapter.store.sbs1 import SBS1Message
-from dump1090adapter.store.store import process2, dump_row, db2, SBS1Changed
+from asyncio import CancelledError, wait_for
+from store.sbs1 import SBS1Message
+from store.store import process2, flush_cache
 from collections import namedtuple
 
 INCOMING_ACTION_TYPE = namedtuple('IncomingAction',['actionTypes','actionMsg', 'aircraftId'])
@@ -10,7 +10,7 @@ INCOMING_ACTION_TYPE = namedtuple('IncomingAction',['actionTypes','actionMsg', '
 LOG = logging.getLogger("dump1090Receiver")
 
 
-async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q = None):
+async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q = None, websocket_Q = None):
     """
         Receive a raw mesage from a Queue parse it sent it to the database_worker (if queue is not None) process the message otherwise)
 
@@ -58,6 +58,11 @@ async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q 
 
                     if radar_Q:
                         radar_Q.put_nowait(incoming_action)
+
+                    if websocket_Q:
+                        websocket_Q.put_nowait(incoming_action)
+
+                flush_cache(300)
 
             else:
                 print("WARN: Invalid sbs1_msg. Failed processing")
