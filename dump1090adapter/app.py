@@ -35,10 +35,6 @@ app.mount("/app", StaticFiles(directory="../public"), name='public')
 app.mount("/static", StaticFiles(directory="../public/static"), name='static')
 
 
-
-
-
-
 html = """
 <!DOCTYPE html>
 <html>
