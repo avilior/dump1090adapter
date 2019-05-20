@@ -89,6 +89,7 @@ async def websocket_endpoint(websocket: WebSocket):
     websocket_clients[netloc] = {"ws": websocket}
 
     try:
+        #TODO send the current state to the new client
         while True:
             #print(F"{websocket.state} {websocket.application_state}")
             data = await websocket.receive_text()
