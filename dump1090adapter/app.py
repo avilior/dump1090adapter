@@ -2,19 +2,12 @@ import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 import uvicorn
-"""
-from dump1090adapter.dump1090TCPListener import dump1090TCPListener
-from dump1090adapter.dump1090processor.dump1090receiver import dump1090Receiver
-from dump1090adapter.monitor import monitor
-from dump1090adapter.store.db_worker import dbWorker
-from dump1090adapter.radar import radar
-"""
 from dump1090TCPListener import dump1090TCPListener
 from dump1090processor.dump1090receiver import dump1090Receiver
 from monitor import monitor_worker
 import monitor
 from store.db_worker import dbWorker
-from radar import radar
+#from radar import radar
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
@@ -122,7 +115,7 @@ async def startup():
     radar_queue           = asyncio.queues.Queue() # used to send the radar task messages to display
     websocket_queue       = asyncio.queues.Queue() # use to send data to the websocket broadcaster
 
-    db_worker_queue = None  # disable database inserts
+    #db_worker_queue = None  # disable database inserts
     radar_queue = None
 
     try:
@@ -130,12 +123,11 @@ async def startup():
         dbWorkerTask = loop.create_task(dbWorker(DB_URL, db_worker_queue))
         tasks.append(dbWorkerTask)
 
-        radarTask = loop.create_task(radar(radar_queue))
-        tasks.append(radarTask)
+        #radarTask = loop.create_task(radar(radar_queue))
+        #tasks.append(radarTask)
 
         dump1090TCPListenerTask = loop.create_task(dump1090TCPListener(dump1090IncomingQueue, dump1090host, dump1090port))
         tasks.append(dump1090TCPListenerTask)
-
 
         dump1090receiverTask = loop.create_task(dump1090Receiver(dump1090IncomingQueue, db_worker_queue, radar_queue, websocket_queue))
         tasks.append(dump1090receiverTask)

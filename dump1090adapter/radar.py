@@ -125,10 +125,6 @@ class Radar():
         self.ax.plot(bearing_as_radian, range, "s")
         track_text = self.ax.text(bearing_as_radian, range, label, **text_style)
 
-
-
-
-
 home_lat = 45.25056
 home_lon = -75.89996
 
