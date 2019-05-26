@@ -24,17 +24,11 @@ CREATE_TRACK_POINT_TABLE = """CREATE TABLE IF NOT EXISTS track_point(
                             PRIMARY KEY (icao, ts)
                         );"""
 
-
-async def dbWorker(db_path: str, db_workerQ: Queue):
-
-    LOG.info("Starting")
-    if db_workerQ is None:
-        LOG.info(F"db worker queue is None not starting ")
-        return
-
-    LOG.info(F"Connecting to db at url: {db_path}")
+async def connectingDB(db_path: str):
 
     try:
+        LOG.info(F"Initialize DB {db_path}")
+
         database = Database(db_path)
 
         await database.connect()
@@ -46,19 +40,32 @@ async def dbWorker(db_path: str, db_workerQ: Queue):
         await transaction.commit()
 
         LOG.info("Connected and created table (if non existed")
+        return database
 
     except Exception:
         LOG.exception("Exception while creating database")
-        LOG.info("Exiting")
+        LOG.info("No database connection made")
         return None
 
+async def dbWorker(database, db_workerQ: Queue):
+
+    LOG.info("Starting")
+    if db_workerQ is None:
+        LOG.info(F"db worker queue is None not starting ")
+        return
+
+    db_connect_retry_count = 0
     while True:
 
         if not database.is_connected:
-            LOG.info(F"@dbWorker: reconnecting to database...")
-            await database.connect()
-            LOG.info(F"@dbWorker: reconnecting to database. Done")
-
+            try:
+                LOG.info(F"@dbWorker: reconnecting to database...")
+                await database.connect()
+                LOG.info(F"@dbWorker: reconnecting to database. Done")
+            except Exception:
+                db_connect_retry_count += 1
+                LOG.exception(F"Failed to connect to db {db_connect_retry_count}")
+                continue
         try:
             while True:
                 incoming_action:INCOMING_ACTION_TYPE = await db_workerQ.get()

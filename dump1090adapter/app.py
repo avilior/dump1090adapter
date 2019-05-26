@@ -6,7 +6,7 @@ from dump1090TCPListener import dump1090TCPListener
 from dump1090processor.dump1090receiver import dump1090Receiver
 from monitor import monitor_worker
 import monitor
-from store.db_worker import dbWorker
+from store.db_worker import dbWorker, connectingDB
 #from radar import radar
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from starlette.responses import HTMLResponse
@@ -30,7 +30,9 @@ LOG.setLevel(logging.DEBUG)
 app = FastAPI()
 
 app.mount("/app", StaticFiles(directory="../public"), name='public')
-app.mount("/static", StaticFiles(directory="../public/static"), name='static')
+
+# weird sometime needed sometime not????
+app.mount("/static", StaticFiles(directory="../public/static",check_dir=False), name='static')
 
 
 html = """
@@ -126,8 +128,13 @@ async def startup():
 
     try:
 
-        dbWorkerTask = loop.create_task(dbWorker(DB_URL, db_worker_queue))
-        tasks.append(dbWorkerTask)
+        db_connection = await connectingDB(DB_URL)
+        if db_connection:
+            dbWorkerTask = loop.create_task(dbWorker(db_connection, db_worker_queue))
+            tasks.append(dbWorkerTask)
+        else:
+            LOG.info("Database is not available")
+            db_worker_queue = None
 
         #radarTask = loop.create_task(radar(radar_queue))
         #tasks.append(radarTask)

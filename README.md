@@ -80,3 +80,47 @@ https://flightaware.com/live/flight/N991CE
 https://fastapi.tiangolo.com/tutorial/async-sql-databases/
 
 https://github.com/encode/databases
+
+# Docker
+
+```
+docker build -t dump1090rx .
+```
+
+```
+docker run -it --rm -p4000:4000 dump1090rx bash
+```
+
+# Issues
+
+## cant reach inside a container to outside mac - Host not reachable
+
+Need to enable ip packet forwarding
+
+```
+MBP2014:~ avi$ sysctl -a net.inet.ip.forwarding
+net.inet.ip.forwarding: 0
+MBP2014:~ avi$ sudo sysctl -w net.inet.ip.forwarding=1
+Password:
+net.inet.ip.forwarding: 0 -> 1
+```
+
+How do i enable perm? Should I enable perm?  What about linux?
+
+To get this going:
+```
+docker run -it ubuntu bash
+
+Then inside the container we need to install ping
+
+# apt-get update
+
+# apt-get install -y iputils-ping
+
+```
+
+On ubuntu this is working fine on MAC i have an issue
+Note on my unbuntu machine forwarding is enabled
+sudo sysctl -a | grep forwarding
+net.ipv4.conf.all.forwarding = 1
+
