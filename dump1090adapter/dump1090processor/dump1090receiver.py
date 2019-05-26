@@ -1,14 +1,15 @@
 import logging
 from asyncio.queues import Queue
-from asyncio import CancelledError, wait_for
+from asyncio import CancelledError
 from store.sbs1 import SBS1Message
 from store.store import process2, flush_cache
 from collections import namedtuple
 
 INCOMING_ACTION_TYPE = namedtuple('IncomingAction',['actionTypes','actionMsg', 'aircraftId'])
 
-LOG = logging.getLogger("dump1090Receiver")
+LOG = logging.getLogger(__name__)
 
+STATS={"incoming":0, "parsing_error": 0}
 
 async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q = None, websocket_Q = None):
     """
@@ -19,6 +20,7 @@ async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q 
     :param radar_Q: queue to send processed messages to radar -- if not None
     :return:
     """
+    LOG.info("Starting")
     try:
         while True:
             raw_sbs1_msg = await incomingQ.get()
@@ -53,6 +55,11 @@ async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q 
 
                     incoming_action = INCOMING_ACTION_TYPE(actionTypes=actionTypesList, actionMsg=result.icao_record, aircraftId=sbs1_msg.icao24)
 
+                    STATS["incoming"] += 1
+
+                    if STATS["incoming"] % 100 == 0:
+                        LOG.info(F"Incoming {STATS['incoming']}")
+
                     if db_worker_Q:
                         db_worker_Q.put_nowait(incoming_action)
 
@@ -65,11 +72,14 @@ async def dump1090Receiver(incomingQ: Queue, db_worker_Q: Queue = None, radar_Q 
                 flush_cache(300)
 
             else:
-                print("WARN: Invalid sbs1_msg. Failed processing")
+                STATS["parsing_error"] += 1
+                LOG.warning(F"Invalid sbs1_msg. Failed processing count: {STATS['parsing_error']}")
+
 
     except CancelledError:
-        pass
-    except Exception as x:
-        print(F"Exception {x}")
+        LOG.info("Cancelling")
+    except Exception:
+        LOG.exception("Any exception")
     finally:
         pass
+    LOG.info("Exiting")

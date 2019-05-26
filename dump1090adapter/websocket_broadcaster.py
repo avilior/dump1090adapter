@@ -3,8 +3,12 @@ import traceback
 from dump1090processor.dump1090receiver import INCOMING_ACTION_TYPE
 from starlette.websockets import WebSocket, WebSocketState
 
+import logging
+
+LOG = logging.getLogger("websocket")
+
 async def websocketBroadcaster(websocket_clients, websocket_queue):
-    print("WEBSOCKET BROADCASTER starting")
+    LOG.info("WEBSOCKET BROADCASTER starting")
     while True:
         try:
             msg:INCOMING_ACTION_TYPE = await websocket_queue.get()
@@ -30,10 +34,9 @@ async def websocketBroadcaster(websocket_clients, websocket_queue):
                     await ws.send_json(msg)
 
         except asyncio.CancelledError:
-            print("Canceled dump period")
+            LOG.info("Canceling")
             break
-        except Exception as x:
-            traceback.print_exc()
-            print(F"websocket: Connection closed {x}")
+        except Exception:
+            LOG.exception("General exception")
 
-    print("WEBSOCKET BROADCASTER STOPPED")
+    LOG.info("WEBSOCKET BROADCASTER STOPPED")

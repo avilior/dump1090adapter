@@ -13,6 +13,7 @@ from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 from websocket_broadcaster import websocketBroadcaster
 
+import logging
 
 #CREATE_DB = True     # always create the db files
 #BASE_DIR = Path(__file__).resolve().parent
@@ -23,7 +24,11 @@ DB_URL = 'sqlite://localhost/../database/dump1090db.sqlite'
 
 tasks = []
 
+LOG = logging.getLogger("app")
+LOG.setLevel(logging.DEBUG)
+
 app = FastAPI()
+
 app.mount("/app", StaticFiles(directory="../public"), name='public')
 app.mount("/static", StaticFiles(directory="../public/static"), name='static')
 
@@ -78,7 +83,7 @@ websocket_clients = {}
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     netloc = F"{websocket.client.host}:{websocket.client.port}"
-    print(F"Connected client {netloc}")
+    LOG.info(F"Connected client {netloc}")
     websocket_clients[netloc] = {"ws": websocket}
 
     try:
@@ -88,9 +93,9 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             #await websocket.send_text(f"Message text was: {data}")
     except WebSocketDisconnect as wsx:
-        print(F"Websocket disconnected: {netloc}")
+        LOG.info(F"Websocket disconnected: {netloc}")
     finally:
-        print(F"Websocket closing: {netloc}")
+        LOG.info(F"Websocket closing: {netloc}")
         await websocket.close()
         del websocket_clients[netloc]
 
@@ -101,7 +106,8 @@ async def read_item(item_id: int, q: str = None):
 
 @app.on_event('startup')
 async def startup():
-    print('startup: starting')
+    LOG.info("Startup: starting")
+
 
     dump1090host = "172.17.17.48"
     dump1090port = 30003
@@ -139,19 +145,24 @@ async def startup():
         websocketBroadcasterTask = loop.create_task(websocketBroadcaster(websocket_clients, websocket_queue))
         tasks.append(websocketBroadcasterTask)
     except Exception as x:
-        print(F"Startup: Exception {x}")
+        LOG.exception(F"Startup: Exception {x}")
 
-    print('startup: finishing')
+    LOG.info('startup: finishing')
 
 @app.on_event('shutdown')
 async def shutdown():
-    print("Shuting down")
+    LOG.info("Shuting down")
 
     for task in tasks:
-        print("shuting down a task")
+        LOG.debug("shuting down a task")
         if not task.cancelled():
             task.cancel()
 
 if __name__ == "__main__":
 
-    uvicorn.run(app, host="0.0.0.0", port=4000, log_level="info")
+
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s.%(msecs)03d|%(name)-12s|%(levelname)-8s| %(message)s',
+                        datefmt='%m-%d %H:%M:%S')
+
+    uvicorn.run(app, host="0.0.0.0", port=4000)

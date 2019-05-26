@@ -8,7 +8,7 @@ from databases import Database
 
 from dump1090processor.dump1090receiver import INCOMING_ACTION_TYPE
 
-LOG = logging.getLogger("dump1090Receiver")
+LOG = logging.getLogger(__name__)
 
 
 CREATE_TRACK_POINT_TABLE = """CREATE TABLE IF NOT EXISTS track_point(
@@ -27,28 +27,37 @@ CREATE_TRACK_POINT_TABLE = """CREATE TABLE IF NOT EXISTS track_point(
 
 async def dbWorker(db_path: str, db_workerQ: Queue):
 
+    LOG.info("Starting")
     if db_workerQ is None:
-        print(F"db worker queue is None not starting ")
+        LOG.info(F"db worker queue is None not starting ")
         return
 
-    print(F"Connecting to db at url: {db_path}")
+    LOG.info(F"Connecting to db at url: {db_path}")
 
-    database = Database(db_path)
+    try:
+        database = Database(db_path)
 
-    await database.connect()
+        await database.connect()
 
-    transaction = await database.transaction()
+        transaction = await database.transaction()
 
-    await database.execute(CREATE_TRACK_POINT_TABLE)
+        await database.execute(CREATE_TRACK_POINT_TABLE)
 
-    await transaction.commit()
+        await transaction.commit()
+
+        LOG.info("Connected and created table (if non existed")
+
+    except Exception:
+        LOG.exception("Exception while creating database")
+        LOG.info("Exiting")
+        return None
 
     while True:
 
         if not database.is_connected:
-            print(F"@dbWorker: reconnecting to database...")
+            LOG.info(F"@dbWorker: reconnecting to database...")
             await database.connect()
-            print(F"@dbWorker: reconnecting to database. Done")
+            LOG.info(F"@dbWorker: reconnecting to database. Done")
 
         try:
             while True:
@@ -62,11 +71,12 @@ async def dbWorker(db_path: str, db_workerQ: Queue):
                 await db_process_sbs1_msg(database, incoming_action.aircraftId, icao_rec['last_seen'], icao_rec['current'])
 
         except CancelledError:
-            print("@dbWorker: Cancellling dbWorker task")
+            LOG.info("Cancelling")
             break
         except Exception as x:
-            print(F"@dbWorker: Exception {x}")
+            LOG.exception("General exception")
         finally:
             await database.disconnect()
 
+    LOG.info("Exiting")
     return None

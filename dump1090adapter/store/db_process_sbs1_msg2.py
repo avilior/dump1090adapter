@@ -3,6 +3,9 @@ from store.sbs1 import SBS1Message
 import aiosqlite
 from databases import Database
 from datetime import datetime
+import logging
+
+LOG = logging.getLogger(__name__)
 
 
 CREATE_ICAO_TABLE = """CREATE TABLE IF NOT EXISTS icao (
@@ -35,9 +38,9 @@ async def create_connection(db_file: Path):
         return conn
 
     except aiosqlite.Error as x:
-        print(x)
+        LOG.exception("aiosqlite error.")
     except Exception as x:
-        print(x)
+        LOG.exception("general exception")
 
     return None
 
@@ -132,10 +135,10 @@ async def upsert_point(database: Database, icao,ts, lat = None,lon = None, calls
         #print("@upsert_point: transaction commited")
 
     except aiosqlite.Error as e:
-        print(F"@upsert_point: Caught aiosqlite.Error: {e}")
+        LOG.error(F"@upsert_point: Caught aiosqlite.Error: {e}")
         raise
     except Exception as x:
-        print(F"@upsert_point: Caught exception {x}")
+        LOG.error(F"@upsert_point: Caught exception {x}")
         raise
 
 async def db_process_sbs1_msg(database, icao24: str, timestamp: datetime, rec: dict):

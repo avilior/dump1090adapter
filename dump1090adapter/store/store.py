@@ -6,6 +6,10 @@ from collections import namedtuple
 
 from geographiclib.geodesic import Geodesic
 
+import logging
+
+LOG = logging.getLogger(__name__)
+
 import aiosqlite
 
 SBS1Changed = namedtuple('SBS1Changed', ['id',
@@ -47,7 +51,7 @@ def flush_cache(seconds):
         max_delta = max(max_delta, delta_sec)
         if delta_sec > 300:
                 items_to_remove.append(id)
-    print(F"FLUSH: length of cache {len(db2)} Items to remove {len(items_to_remove)} max: {max_delta}")
+    LOG.info(F"FLUSH: length of cache {len(db2)} Items to remove {len(items_to_remove)} max: {max_delta}")
     for id in items_to_remove:
         del db2[id]
 

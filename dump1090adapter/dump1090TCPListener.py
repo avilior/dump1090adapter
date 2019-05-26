@@ -10,8 +10,8 @@ STATS = { "msg_rx" : 0, "max_incomingQ_size" : 0, 'connection_closed' : False, "
 
 async def dump1090TCPListener(incomingQ: Queue, host: str, port:int):
 
-    print("dump_receiver starting")
-    LOG.info(F"Opening TCP Stream to Dump Server at: {host}:{port}")
+
+    LOG.info(F"Starting: Opening TCP Stream to Dump Server at: {host}:{port}")
 
     while True:
 
@@ -25,11 +25,12 @@ async def dump1090TCPListener(incomingQ: Queue, host: str, port:int):
             STATS['connections_exception'] += 1
             continue
 
-        print("Got stream_reader")
+        LOG.info ("Got stream_reader")
         try:
             BUFSIZE = 1024
             data = ""
             while True:
+
                 new_data = await stream_reader.read(BUFSIZE)
 
                 if not new_data:
@@ -59,6 +60,9 @@ async def dump1090TCPListener(incomingQ: Queue, host: str, port:int):
                         STATS["max_incomingQ_size"] = max(incomingQ.qsize(),STATS["max_incomingQ_size"])
                         # print(F"done")
 
+                        if STATS["msg_rx"] % 100 == 0:
+                            LOG.info(F"Rxed {STATS['msg_rx']} max_q size {STATS['max_incomingQ_size']}")
+
                         cur_pos = cr_index + 1
                         data = data[cur_pos:]
                         cur_pos = 0
@@ -67,12 +71,12 @@ async def dump1090TCPListener(incomingQ: Queue, host: str, port:int):
                         break
 
         except CancelledError:
-            print("Cancelled exception.  Cancelling dump1090TCPListener")
+            LOG.info("Cancelling")
             break
-        except Exception as x:
-            LOG.exception(x)
-            print(F"Got exception {x}")
+        except Exception:
+            LOG.exception("General exception")
+
         finally:
             pass
 
-    print(F"Exiting dump1090TCPListener")
+    LOG.info(F"Exiting")
