@@ -91,6 +91,10 @@ docker build -t dump1090rx .
 docker run -it --rm -p4000:4000 dump1090rx bash
 ```
 
+```
+ docker run -it -p 4000:4000 -v $PWD/public/:/public/ --name dump1090rx dump1090rx bash
+ ```
+
 # Issues
 
 ## cant reach inside a container to outside mac - Host not reachable

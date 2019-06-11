@@ -1,8 +1,19 @@
 FROM python:3.6-slim
 
-ENV PYTHONBUFFERED=1
+ARG BIND_HOST=0.0.0.0
+ARG LISTEN_PORT=80
 
-EXPOSE 4000/tcp
+ENV PYTHONBUFFERED=1
+ENV HOST=$BIND_HOST
+ENV PORT=$LISTEN_PORT
+
+ENV DB_URL=sqlite://localhost/../database/dump1090db.sqlite
+ENV PUBLIC_PATH=../public
+ENV DUMPHOST=0.0.0.0
+ENV DUMPPORT=30003
+
+
+EXPOSE $LISTEN_PORT/tcp
 
 RUN mkdir -p /public \
     && mkdir -p /app
@@ -25,4 +36,6 @@ RUN set -eux \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
-COPY ./dump1090adapter /app/
+COPY ./dump1090adapter .
+
+ENTRYPOINT ["python","-m", "app"]
