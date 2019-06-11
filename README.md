@@ -83,6 +83,23 @@ https://github.com/encode/databases
 
 # Docker
 
+Added environment variable so these have to be specified 
+```bash
+ARG BIND_HOST=0.0.0.0
+ARG LISTEN_PORT=80
+
+ENV PYTHONBUFFERED=1
+ENV HOST=$BIND_HOST
+ENV PORT=$LISTEN_PORT
+
+ENV DB_URL=sqlite://localhost/../database/dump1090db.sqlite
+ENV PUBLIC_PATH=../public
+ENV DUMPHOST=0.0.0.0
+ENV DUMPPORT=30003
+
+```
+
+
 ```
 docker build -t dump1090rx .
 ```
