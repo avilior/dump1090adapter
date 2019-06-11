@@ -1,5 +1,7 @@
 FROM python:3.6-slim
 
+LABEL maintainer="avi@lior.org"
+
 ARG BIND_HOST=0.0.0.0
 ARG LISTEN_PORT=80
 
